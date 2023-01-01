@@ -1,5 +1,5 @@
 #lang pl
-
+; =====Q2=====
 
 #|
 FLANG ::= <num> 1
@@ -12,14 +12,15 @@ FLANG ::= <num> 1
          | { = <FLANG> <FLANG> } 8
          | <True> 9
          | <False> 10
-         | { if { <FLANG> <FLANG> } <FLANG> } 11
+         | {if <FLANG> {then-do <FLANG>} {else-do <FLANG>}} 11
          | { with { <id> <FLANG> } <FLANG> }  12
          | <id>  13
          | { fun { <id> } <FLANG> }  14
          | { call <FLANG> <FLANG> }  15
-
+         | { not <Boolean>}
 |#
 
+;=====Q3=====
 
 (define-type FLANG
 [ Num Number ]
@@ -29,46 +30,51 @@ FLANG ::= <num> 1
 [ Div FLANG FLANG ]
 [ Id Symbol ]
 [ Bool Boolean]
-[ Eq FLANG FLANG]
-[ Gt FLANG FLANG]
+[ Eq FLANG FLANG ]
+[ Gt FLANG FLANG ]
 [ Lt FLANG FLANG ]
 [ If FLANG FLANG FLANG]
-[ with Symbol FLANG FLAN ]
-[ fun Symbol FLANG ]
-[ call FLANG ])
+[ With Symbol FLANG FLANG ]
+[ Fun Symbol FLANG ]
+[ Call FLANG FLANG ]
+[ Not FLANG ])
+
 
 (: parse-sexpr : Sexpr -> FLANG)
 ;; to convert s-expressions into FLANGs
 (define (parse-sexpr sexpr)
 (match sexpr
 [(number: n) (Num n)]
+['True (Bool true)]
+['False (Bool false)]
 [(symbol: name) (Id name)]
-['True (Bool #t)]
-['False (Bool #f)]
-[(cons 'if more)
-(match sexpr
-[(list 'if cond 'then t-do 'else e-do)
-(If (parse-sexpr cond) (parse-sexpr t-do) (parse-sexpr e-do))]
-[else (error 'parse-sexpr "bad `if' syntax in ~s" sexpr)])]
 [(cons 'with more)
 (match sexpr
 [(list 'with (list (symbol: name) named) body)
-(with name (parse-sexpr named) (parse-sexpr body))]
+(With name (parse-sexpr named) (parse-sexpr body))]
 [else (error 'parse-sexpr "bad `with' syntax in ~s" sexpr)])]
 [(cons 'fun more)
 (match sexpr
 [(list 'fun (list (symbol: name)) body)
-(fun name (parse-sexpr body))]
+(Fun name (parse-sexpr body))]
 [else (error 'parse-sexpr "bad `fun' syntax in ~s" sexpr)])]
+[(list 'call fun arg) (Call (parse-sexpr fun) (parse-sexpr arg))]
 [(list '+ l r) (Add (parse-sexpr l) (parse-sexpr r))]
 [(list '- l r) (Sub (parse-sexpr l) (parse-sexpr r))]
 [(list '* l r) (Mul (parse-sexpr l) (parse-sexpr r))]
 [(list '/ l r) (Div (parse-sexpr l) (parse-sexpr r))]
-[(list '> lhs rhs) (Lt (parse-sexpr lhs) (parse-sexpr rhs))]
+[(list '> lhs rhs) (Gt (parse-sexpr lhs) (parse-sexpr rhs))]
 [(list '< lhs rhs) (Lt (parse-sexpr lhs) (parse-sexpr rhs))]
 [(list '= lhs rhs) (Eq (parse-sexpr lhs) (parse-sexpr rhs))]
-[(list 'call fun arg) (call (parse-sexpr fun) (parse-sexpr arg))]
+[(list 'not sxp) (Not (parse-sexpr sxp))]
+[(cons 'if more)
+(match sexpr
+[(list 'if econd (list (symbol: then-do) t-do) (list (symbol: else-do) e-do))
+(If (parse-sexpr econd) (parse-sexpr t-do) (parse-sexpr e-do))]
+[else (error 'parse-sexpr "bad `if' syntax in ~s" sexpr)])]
 [else (error 'parse-sexpr "bad syntax in ~s" sexpr)]))
+                 
+
 
 
 (: parse : String -> FLANG)
@@ -76,12 +82,47 @@ FLANG ::= <num> 1
 (define (parse str)
 (parse-sexpr (string->sexpr str)))
 
+;=== tests==
+; half of the tests are from the class 
+
+(test (parse "4") => (Num 4))
+(test (parse "0") => (Num 0))
+(test (parse "{+ 3 5}") => (Add (Num 3) (Num 5)))
+(test (parse "{- 3 5}") => (Sub (Num 3) (Num 5)))
+(test (parse "{+ 3 {- 8 {+ 2 1}}}") => (Add (Num 3) (Sub (Num 8) (Add (Num 2) (Num 1)))))
+(test (parse "{+ 1 2 3}") =error> "bad syntax")
+
+(test (parse "{with {x {+ 4 2}} {* x x}}") => (With 'x (Add (Num 4) (Num 2))
+                                              (Mul (Id 'x) (Id 'x))))
+
+(test (parse "{fun {x} x}") => (Fun 'x (Id 'x)))
+(test (parse "{fun {x} {/ x 5}}") => (Fun 'x (Div (Id 'x) (Num 5))))
+(test (parse "{call {fun {x} {/ x 5}} 8}") => (Call {Fun 'x (Div (Id 'x) (Num 5))} (Num 8)))
+(test (parse "{with {sqr {fun {x} {* x x}}}
+                                    {+ {call sqr 5}
+                                        {call sqr 6}}}") =>
+                 (With 'sqr (Fun 'x (Mul (Id 'x) (Id 'x)))
+                       (Add (Call (Id 'sqr) (Num 5))
+                            (Call (Id 'sqr) (Num 6)))))
+(test (parse "{fun x {* x x}}")=error> "bad `fun' syntax")
+(test (parse "{if True {than-do 1} {else-do 0}}")
+      => (If (Bool true) (Num 1) (Num 0)))
+(test (parse "{if False {than-do 0} {else-do 1}}")
+      => (If (Bool false) (Num 0) (Num 1)))
+(test (parse "{if {< 1 100} {than-do 1} {else-do 0}}")
+      => (If (Lt (Num 1) (Num 100)) (Num 1) (Num 0)))
+(test (parse "{if {> 100 1} {than-do 0} {else-do 1}}")
+      => (If (Gt (Num 100) (Num 1)) (Num 0) (Num 1)))
+(test (parse "{if {= True True} {than-do 1} {else-do 0}}")
+      => (If (Eq (Bool true) (Bool true)) (Num 1) (Num 0)))
+(test (parse "{if {= False False} {than-do 1} {else-do 0}}")
+      => (If (Eq (Bool false) (Bool false)) (Num 1) (Num 0)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 
-  
-;; tests
+  #|;; tests
 (test (run "True") => true)
 (test (run "{not True}") => false)
 (test (run "{> 3 44}") => false)
@@ -104,3 +145,6 @@ FLANG ::= <num> 1
 (test (run "{< false 5}") =error> "eval: free identifier: false")
 (test (run "{< False 5}")
  =error> "Num->number: expected a number, got: #(struct:Bool #f)")
+
+
+|#
