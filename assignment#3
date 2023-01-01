@@ -7,37 +7,39 @@ FLANG ::= <num> 1
          | { - <FLANG> <FLANG> } 3
          | { * <FLANG> <FLANG> } 4
          | { / <FLANG> <FLANG> } 5
-         | { > <FLANG> <FLANG> } 6
-         | { < <FLANG> <FLANG> } 7
-         | { = <FLANG> <FLANG> } 8
-         | <True> 9
-         | <False> 10
-         | {if <FLANG> {then-do <FLANG>} {else-do <FLANG>}} 11
-         | { with { <id> <FLANG> } <FLANG> }  12
-         | <id>  13
-         | { fun { <id> } <FLANG> }  14
-         | { call <FLANG> <FLANG> }  15
-         | { not <Boolean>}
+         | { with { <id> <FLANG> } <FLANG> }  6
+         | <id>  7
+         | { fun { <id> } <FLANG> }  8
+         | { call <FLANG> <FLANG> }  9
+         | <True> 10
+         | <False> 11
+         | { > <FLANG> <FLANG> } 12
+         | { < <FLANG> <FLANG> } 13
+         | { = <FLANG> <FLANG> } 14
+         | { not <Boolean>} 15
+         | {if <FLANG> {then-do <FLANG>} {else-do <FLANG>}} 16
+        
+  
 |#
 
 ;=====Q3=====
 
 (define-type FLANG
-[ Num Number ]
-[ Add FLANG FLANG ]
-[ Sub FLANG FLANG ]
-[ Mul FLANG FLANG ]
-[ Div FLANG FLANG ]
-[ Id Symbol ]
-[ Bool Boolean]
-[ Eq FLANG FLANG ]
-[ Gt FLANG FLANG ]
-[ Lt FLANG FLANG ]
-[ If FLANG FLANG FLANG]
-[ With Symbol FLANG FLANG ]
-[ Fun Symbol FLANG ]
-[ Call FLANG FLANG ]
-[ Not FLANG ])
+[ Num Number ] ;1
+[ Add FLANG FLANG ] ;2
+[ Sub FLANG FLANG ] ;3
+[ Mul FLANG FLANG ] ;4
+[ Div FLANG FLANG ] ;5
+[ With Symbol FLANG FLANG ] ;6
+[ Id Symbol ]       ;7
+[ Fun Symbol FLANG ];8
+[ Call FLANG FLANG ];9
+[ Bool Boolean]     ;10+11
+[ Bigger FLANG FLANG ]  ;12
+[ Smaller FLANG FLANG ]  ;13
+[ Equal FLANG FLANG ]  ;14
+[ Not FLANG ]       ;15
+[ If FLANG FLANG FLANG]);16
 
 
 (: parse-sexpr : Sexpr -> FLANG)
@@ -48,6 +50,10 @@ FLANG ::= <num> 1
 ['True (Bool true)]
 ['False (Bool false)]
 [(symbol: name) (Id name)]
+[(list '+ l r) (Add (parse-sexpr l) (parse-sexpr r))]
+[(list '- l r) (Sub (parse-sexpr l) (parse-sexpr r))]
+[(list '* l r) (Mul (parse-sexpr l) (parse-sexpr r))]
+[(list '/ l r) (Div (parse-sexpr l) (parse-sexpr r))]
 [(cons 'with more)
 (match sexpr
 [(list 'with (list (symbol: name) named) body)
@@ -59,18 +65,14 @@ FLANG ::= <num> 1
 (Fun name (parse-sexpr body))]
 [else (error 'parse-sexpr "bad `fun' syntax in ~s" sexpr)])]
 [(list 'call fun arg) (Call (parse-sexpr fun) (parse-sexpr arg))]
-[(list '+ l r) (Add (parse-sexpr l) (parse-sexpr r))]
-[(list '- l r) (Sub (parse-sexpr l) (parse-sexpr r))]
-[(list '* l r) (Mul (parse-sexpr l) (parse-sexpr r))]
-[(list '/ l r) (Div (parse-sexpr l) (parse-sexpr r))]
-[(list '> lhs rhs) (Gt (parse-sexpr lhs) (parse-sexpr rhs))]
-[(list '< lhs rhs) (Lt (parse-sexpr lhs) (parse-sexpr rhs))]
-[(list '= lhs rhs) (Eq (parse-sexpr lhs) (parse-sexpr rhs))]
+[(list '= lhs rhs) (Equal (parse-sexpr lhs) (parse-sexpr rhs))]
+[(list '> lhs rhs) (Bigger (parse-sexpr lhs) (parse-sexpr rhs))]
+[(list '< lhs rhs) (Smaller (parse-sexpr lhs) (parse-sexpr rhs))]
 [(list 'not sxp) (Not (parse-sexpr sxp))]
 [(cons 'if more)
 (match sexpr
-[(list 'if econd (list (symbol: then-do) t-do) (list (symbol: else-do) e-do))
-(If (parse-sexpr econd) (parse-sexpr t-do) (parse-sexpr e-do))]
+[(list 'if cond (list (symbol: then-do) t-do) (list (symbol: else-do) e-do))
+(If (parse-sexpr cond) (parse-sexpr t-do) (parse-sexpr e-do))]
 [else (error 'parse-sexpr "bad `if' syntax in ~s" sexpr)])]
 [else (error 'parse-sexpr "bad syntax in ~s" sexpr)]))
                  
@@ -110,19 +112,234 @@ FLANG ::= <num> 1
 (test (parse "{if False {than-do 0} {else-do 1}}")
       => (If (Bool false) (Num 0) (Num 1)))
 (test (parse "{if {< 1 100} {than-do 1} {else-do 0}}")
-      => (If (Lt (Num 1) (Num 100)) (Num 1) (Num 0)))
+      => (If (Smaller (Num 1) (Num 100)) (Num 1) (Num 0)))
 (test (parse "{if {> 100 1} {than-do 0} {else-do 1}}")
-      => (If (Gt (Num 100) (Num 1)) (Num 0) (Num 1)))
+      => (If (Bigger (Num 100) (Num 1)) (Num 0) (Num 1)))
 (test (parse "{if {= True True} {than-do 1} {else-do 0}}")
-      => (If (Eq (Bool true) (Bool true)) (Num 1) (Num 0)))
+      => (If (Equal (Bool true) (Bool true)) (Num 1) (Num 0)))
 (test (parse "{if {= False False} {than-do 1} {else-do 0}}")
-      => (If (Eq (Bool false) (Bool false)) (Num 1) (Num 0)))
+      => (If (Equal (Bool false) (Bool false)) (Num 1) (Num 0)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;=====Q4=====
+#|
+ e[v/i]= To substitute all the identifiers that have the same name 'i' in
+ the expression 'e' with the expression 'v', replace all the instances
+ of 'i', that are free 'e' with the expression 'v'.
+Formal Substitution rules: 
+1. N[v/x] = N
+2. {+ E1 E2}[v/x] = {+ E1[v/x] E2[v/x]}
+3. {- E1 E2}[v/x] = {- E1[v/x] E2[v/x]}
+4. {* E1 E2}[v/x] = {* E1[v/x] E2[v/x]}
+5. {/ E1 E2}[v/x] = {/ E1[v/x] E2[v/x]}
+6. y[v/x] = y
+7. x[v/x] = v
+8. {with {y E1} E2}[v/x] = {with {y E1[v/x]} E2[v/x]}
+9. {with {x E1} E2}[v/x] = {with {y E1[v/x]} E2}
+10. {call E1 E2}[v/x] = {call E1[v/x] E2[v/x]}
+11. {fun {y} E}[v/x] = {fun {y} E[v/x]}
+12. {fun {x} E}[v/x] = {fun {x} E}
+13. B[v/x] = B
+14. {= E1 E2}[v/x] = {= E1[v/x] E2[v/x]}
+15. {> E1 E2}[v/x] = {> E1[v/x] E2[v/x]}
+16. {< E1 E2}[v/x] = {< E1[v/x] E2[v/x]}
+17. {not E}[v/x] = {not E[v/x]}
+18. {if cond {then-do t-do} {else-do e-do}}[v/x] = {if cond[v/x] {then-do t-do[v/x]} {else-do e-do[v/x]}}
 
 
-  #|;; tests
+
+|#
+
+(: subst : FLANG Symbol FLANG -> FLANG)
+ ;; substitutes the second argument with the third argument in the
+ ;; first argument, as per the rules of substitution; the resulting
+ ;; expression contains no free instances of the second argument 
+(define (subst expr from to)
+        (cases expr
+            [(Num n) expr]
+            [(Add l r) (Add (subst l from to) (subst r from to))]
+            [(Sub l r) (Sub (subst l from to) (subst r from to))]
+            [(Mul l r) (Mul (subst l from to) (subst r from to))]
+            [(Div l r) (Div (subst l from to) (subst r from to))]
+            [(With name named body) (With name (subst named from to)
+                                 (if (eq? from name) body (subst body from to)))]
+            [(Fun name body) (Fun name
+                                  (if (eq? name from) body (subst  body from to)))]
+            [(Call fun-expr arg-expr)  (Call (subst fun-expr from to) (subst arg-expr from to))]
+            [(Id name) (if (eq? from name) to expr)]
+            [(Bool b) expr]
+            [(Equal l r) (Equal (subst l from to) (subst r from to))]
+            [(Bigger l r) (Bigger (subst l from to) (subst r from to))]
+            [(Smaller l r) (Smaller (subst l from to) (subst r from to))]
+            [(Not b) (Not (subst b from to))]
+            [(If cond t-do e-do)(If (subst cond from to)(subst t-do from to)(subst e-do from to))]))
+          
+;====tests====
+;; haif of the tests are from to class
+
+(test (subst (Mul (Id 'x) (Id 'x)); ==> e
+       'x ;==> i
+       (Num 6) ;==> v
+       ) => (Mul (Num 6) (Num 6)))
+
+
+(test (subst (Id 'x)
+             'x
+             (Num 8)) => (Num 8))
+
+(test (subst (Id 'y)
+             'x
+             (Num 8)) => (Id 'y))
+(test (subst (With 'x (Num 3)
+                   (Id 'x))
+             'x
+             (Num 5)) => (With 'x (Num 3)
+                   (Id 'x)))
+(test (subst (With 'y
+                   (Add (Id 'x) (Num 3))
+                   (Add (Id 'x) (Num 5)))
+             'x
+             (Num 4)) => (With 'y
+                               (Add (Num 4) (Num 3))
+                               (Add (Num 4) (Num 5))))
+
+(test (subst (Fun 'x (Add (Id 'x) (Id 'y)))
+             'x
+             (Num 4)) => (Fun 'x (Add (Id 'x) (Id 'y))))
+
+(test (subst (Fun 'x (Add (Id 'x) (Id 'y)))
+             'y
+             (Num 4)) => (Fun 'x (Add (Id 'x) (Num 4))))
+(test (subst (Call (Fun 'x (Div (Id 'x) (Id 'y)))
+                   (Add (Id 'x) (Id 'y)))
+                   'x
+                   (Num 3)) => (Call (Fun 'x (Div (Id 'x) (Id 'y)))
+                   (Add (Num 3) (Id 'y))))
+
+(test (subst (Call (Fun 'x (Div (Id 'x) (Id 'y)))
+                   (Add (Id 'x) (Id 'y)))
+                   'y
+                   (Num 3)) => (Call (Fun 'x (Div (Id 'x) (Num 3)))
+                   (Add (Id 'x) (Num 3))))
+(test (subst (Equal (Id 'x) (Num 3)) 'x (Num 3))
+             => (Equal (Num 3) (Num 3)))
+(test (subst (Smaller (Num 3) (Id 'x)) 'x (Num 3))
+             => (Smaller (Num 3) (Num 3)))
+(test (subst (Bigger (Num 4) (Id 'x)) 'x (Num 4))
+             => (Bigger (Num 4) (Num 4)))
+(test (subst (If (Bigger (Num 7) (Id 'x)) (Num 1) (Num 0)) 'x (Num 7))
+      =>    (If (Bigger (Num 7) (Num 7)) (Num 1) (Num 0)))
+
+
+;; The following function is used in multiple places below,
+ ;; hence, it is now a top-level definition
+ (: Num->number : FLANG -> Number)
+ ;; gets a FLANG -- presumably a Num variant -- and returns the
+ ;; unwrapped number
+(define (Num->number e)
+ (cases e
+ [(Num n) n]
+ [else (error 'Num->number "expected a number, got: ~s" e)]))
+ (: arith-op : (Number Number -> Number) FLANG FLANG -> FLANG)
+ ;; gets a Racket numeric binary operator, and uses it within a FLANG
+ ;; `Num' wrapper
+ (define (arith-op op expr1 expr2)
+ (Num (op (Num->number expr1) (Num->number expr2))))
+ (: logic-op : (Number Number -> Boolean) FLANG FLANG -> FLANG)
+ ;; gets a Racket Boolean binary operator (on numbers), and applies it
+ ;; to two `Num' wrapped FLANGs
+ (define (logic-op op expr1 expr2)
+ (Bool (op (Num->number expr1) (Num->number expr2))))
+ (: flang->bool : FLANG -> Boolean)
+ ;; gets a Flang E (of any kind) and returns a its appropiate
+ ;; Boolean value -- which is true if and only if E does not
+ ;; represent false
+ ;; Remark: the `flang->bool` function will also be top-level
+ ;; since it's used in more than one place.
+ (define (flang->bool e)
+ (cases e
+[(Bool b) b]
+[(Equal l r) (flang->bool (logic-op eq? l r))]
+[(Bigger l r) (flang->bool (logic-op > l r))]
+[(Smaller l r) (flang->bool (logic-op < l r))]
+[(Not b) (not b)]
+[else true]))
+
+
+
+
+#|
+eval: Evaluation rules:
+
+1. eval(N) = N                 ;; N is an expression for a numeric value
+2. eval({+ E1 E2}) = eval(E1) + eval(E2) \ if both E1 and E2
+3. eval({- E1 E2}) = eval(E1) - eval(E2) \ evaluate to numbers
+4. eval({* E1 E2}) = eval(E1) * eval(E2) / otherwise error!
+5. eval({/ E1 E2}) = eval(E1) / eval(E2) /
+6. eval(id) = error!
+7. eval({with {x E1} E2}) = eval(E2[eval(E1)/x])
+8. eval(FUN) = FUN ; assuming FUN is a function expression
+9. eval({call E1 E2}) = eval(Ef[eval(E2)/x])
+10. if eval(E1)={fun {x} Ef} = error! otherwise
+11. eval(B) = B ;; B is an expression for a Boolean value
+12. eval({= E1 E2}) = eval(E1) = eval(E2) \ if both E1 and E2
+13. eval({> E1 E2}) = eval(E1) > eval(E2) \ evaluate to numbers
+14. eval({< E1 E2}) = eval(E1) < eval(E2) / otherwise error!
+15. eval({not E}) = not(eval(E)) /E may be anything
+16. eval({if Econd {then-do Edo} {else-do Eelse}})= eval(Edo) if eval(Econd) =/= false,
+17. eval(Eelse), otherwise.
+
+|#
+
+
+(: eval : FLANG -> FLANG)
+ ;; evaluates FLANG expressions by reducing them to *expressions*
+(define (eval expr)
+        (cases expr
+            [(Num n) expr]
+            [(Add l r)  (arith-op + (eval l) (eval r))]
+            [(Sub l r) (arith-op - (eval l) (eval r))]
+            [(Mul l r) (arith-op * (eval l) (eval r))]
+            [(Div l r) (arith-op / (eval l) (eval r))]
+            [(With name named body) (eval (subst body name (eval named)))]
+            [(Id name) (error 'eval "free identifier: ~s" name)]
+            [(Fun name body) expr]
+            [(Call fun-expr arg-expr) (let ([fval (eval fun-expr)])
+                                        (cases fval
+                                          [(Fun name body) (eval (subst body
+                                                                        name
+                                                                        (eval arg-expr)))]
+                                          [else (error 'eval "expected a function, got: ~s" fval)]))]
+            [(Bool b) expr]
+            [(Equal l r) (logic-op = (eval l) (eval r))]
+            [(Smaller l r) (logic-op < (eval l) (eval r))]
+            [(Bigger l r) (logic-op > (eval l) (eval r))]
+            [(If l m r) (let ([val (flang->bool l)]) (if val (eval m) (eval r)))]
+            [(Not exp) (Bool (not (flang->bool (eval exp))))]))
+
+
+(: run : String -> (U Number Boolean FLANG))
+(define (run str)
+  (let ([result  (eval (parse str))])
+        (cases result 
+          [(Num n) n]
+          [(Bool b) b]
+          [else result])))
+
+
+
+
+
+
+
+
+
+(test (run "5") => 5)
+(test (run "{+ 4 6}") => 10)
+(test (run "{+ 4 6}") => 10)
+(test (run "{call {fun {x} {+ x 7}} {with {x 8} {+ x 7}}}") => 22)
+
 (test (run "True") => true)
 (test (run "{not True}") => false)
 (test (run "{> 3 44}") => false)
@@ -147,4 +364,3 @@ FLANG ::= <num> 1
  =error> "Num->number: expected a number, got: #(struct:Bool #f)")
 
 
-|#
