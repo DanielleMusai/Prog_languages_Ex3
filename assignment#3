@@ -1,4 +1,11 @@
 #lang pl
+#|
+Homework #3:
+Substitution based Interpreter – Expanding the FLANG Language
+using the interpreter we have seen in class as a basis for our code
+Authors : Eran Tzarum & Danielle Musai
+|#
+
 ; =====Q2=====
 
 #|
@@ -84,7 +91,7 @@ FLANG ::= <num> 1
 (define (parse str)
 (parse-sexpr (string->sexpr str)))
 
-;=== tests==
+;===== tests =====
 ; half of the tests are from the class 
 
 (test (parse "4") => (Num 4))
@@ -107,6 +114,10 @@ FLANG ::= <num> 1
                        (Add (Call (Id 'sqr) (Num 5))
                             (Call (Id 'sqr) (Num 6)))))
 (test (parse "{fun x {* x x}}")=error> "bad `fun' syntax")
+(test (parse "{with {x {- 6 3}} {* x 2}}") => (With 'x (Sub (Num 6) (Num 3))
+                                              (Mul (Id 'x) (Num 2))))
+(test (parse "{if {= 1 1} {than-do 1} {else-do 0}}")
+      => (If (Equal (Num 1) (Num 1)) (Num 1) (Num 0)))
 (test (parse "{if True {than-do 1} {else-do 0}}")
       => (If (Bool true) (Num 1) (Num 0)))
 (test (parse "{if False {than-do 0} {else-do 1}}")
@@ -117,12 +128,11 @@ FLANG ::= <num> 1
       => (If (Bigger (Num 100) (Num 1)) (Num 0) (Num 1)))
 (test (parse "{if {= True True} {than-do 1} {else-do 0}}")
       => (If (Equal (Bool true) (Bool true)) (Num 1) (Num 0)))
-(test (parse "{if {= False False} {than-do 1} {else-do 0}}")
-      => (If (Equal (Bool false) (Bool false)) (Num 1) (Num 0)))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;=====Q4=====
+;===== Q4 =====
 #|
  e[v/i]= To substitute all the identifiers that have the same name 'i' in
  the expression 'e' with the expression 'v', replace all the instances
@@ -175,7 +185,7 @@ Formal Substitution rules:
             [(Not b) (Not (subst b from to))]
             [(If cond t-do e-do)(If (subst cond from to)(subst t-do from to)(subst e-do from to))]))
           
-;====tests====
+;===== tests =====
 ;; haif of the tests are from to class
 
 (test (subst (Mul (Id 'x) (Id 'x)); ==> e
@@ -222,6 +232,11 @@ Formal Substitution rules:
                    'y
                    (Num 3)) => (Call (Fun 'x (Div (Id 'x) (Num 3)))
                    (Add (Id 'x) (Num 3))))
+(test (subst (Call (Fun 'x (Mul (Id 'x) (Id 'x)))
+                   (Add (Id 'x) (Id 'y)))
+                   'y
+                   (Num 1)) => (Call (Fun 'x (Mul (Id 'x) (Id 'x)))
+                   (Add (Id 'x) (Num 1))))
 (test (subst (Equal (Id 'x) (Num 3)) 'x (Num 3))
              => (Equal (Num 3) (Num 3)))
 (test (subst (Smaller (Num 3) (Id 'x)) 'x (Num 3))
@@ -230,14 +245,19 @@ Formal Substitution rules:
              => (Bigger (Num 4) (Num 4)))
 (test (subst (If (Bigger (Num 7) (Id 'x)) (Num 1) (Num 0)) 'x (Num 7))
       =>    (If (Bigger (Num 7) (Num 7)) (Num 1) (Num 0)))
+(test (subst (If (Bigger (Id 'y) (Num 2)) (Num 1) (Num 0)) 'y (Num 1))
+      =>    (If (Bigger (Num 1) (Num 2)) (Num 1) (Num 0)))
+(test (subst (If (Bigger (Id 'y) (Id 'x)) (Num 1) (Num 0)) 'y (Num 1))
+      =>    (If (Bigger (Num 1) (Id 'x)) (Num 1) (Num 0)))
 
 
-;; The following function is used in multiple places below,
+
+ ;; The following function is used in multiple places below,
  ;; hence, it is now a top-level definition
  (: Num->number : FLANG -> Number)
  ;; gets a FLANG -- presumably a Num variant -- and returns the
  ;; unwrapped number
-(define (Num->number e)
+ (define (Num->number e)
  (cases e
  [(Num n) n]
  [else (error 'Num->number "expected a number, got: ~s" e)]))
@@ -267,12 +287,10 @@ Formal Substitution rules:
 [else true]))
 
 
-
-
 #|
 eval: Evaluation rules:
 
-1. eval(N) = N                 ;; N is an expression for a numeric value
+1. eval(N) = N   ;; N is an expression for a numeric value
 2. eval({+ E1 E2}) = eval(E1) + eval(E2) \ if both E1 and E2
 3. eval({- E1 E2}) = eval(E1) - eval(E2) \ evaluate to numbers
 4. eval({* E1 E2}) = eval(E1) * eval(E2) / otherwise error!
@@ -327,19 +345,13 @@ eval: Evaluation rules:
           [(Bool b) b]
           [else result])))
 
-
-
-
-
-
-
+;===== tests =====
 
 
 (test (run "5") => 5)
 (test (run "{+ 4 6}") => 10)
 (test (run "{+ 4 6}") => 10)
 (test (run "{call {fun {x} {+ x 7}} {with {x 8} {+ x 7}}}") => 22)
-
 (test (run "True") => true)
 (test (run "{not True}") => false)
 (test (run "{> 3 44}") => false)
