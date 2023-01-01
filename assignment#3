@@ -6,9 +6,10 @@ using the interpreter we have seen in class as a basis for our code
 Authors : Eran Tzarum & Danielle Musai
 |#
 
-; =====Q2=====
-
+; ====== Q2 ======
 #|
+  Expanding the FLANG BNF language
+
 FLANG ::= <num> 1
          | { + <FLANG> <FLANG> } 2
          | { - <FLANG> <FLANG> } 3
@@ -29,7 +30,9 @@ FLANG ::= <num> 1
   
 |#
 
-;=====Q3=====
+;===== Q3 =====
+
+; Extending the Parser
 
 (define-type FLANG
 [ Num Number ] ;1
@@ -78,8 +81,8 @@ FLANG ::= <num> 1
 [(list 'not sxp) (Not (parse-sexpr sxp))]
 [(cons 'if more)
 (match sexpr
-[(list 'if cond (list (symbol: then-do) t-do) (list (symbol: else-do) e-do))
-(If (parse-sexpr cond) (parse-sexpr t-do) (parse-sexpr e-do))]
+[(list 'if Econd  (list (symbol: then-do) Edo) (list (symbol: else-do) Eelse))
+(If (parse-sexpr Econd ) (parse-sexpr Edo) (parse-sexpr Eelse))]
 [else (error 'parse-sexpr "bad `if' syntax in ~s" sexpr)])]
 [else (error 'parse-sexpr "bad syntax in ~s" sexpr)]))
                  
@@ -133,7 +136,10 @@ FLANG ::= <num> 1
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;===== Q4 =====
+
 #|
+ Extending subst and eval 
+
  e[v/i]= To substitute all the identifiers that have the same name 'i' in
  the expression 'e' with the expression 'v', replace all the instances
  of 'i', that are free 'e' with the expression 'v'.
@@ -155,7 +161,7 @@ Formal Substitution rules:
 15. {> E1 E2}[v/x] = {> E1[v/x] E2[v/x]}
 16. {< E1 E2}[v/x] = {< E1[v/x] E2[v/x]}
 17. {not E}[v/x] = {not E[v/x]}
-18. {if cond {then-do t-do} {else-do e-do}}[v/x] = {if cond[v/x] {then-do t-do[v/x]} {else-do e-do[v/x]}}
+18. {if Econd  {then-do Edo} {else-do Eelse}}[v/x] = {if Econd [v/x] {then-do Edo[v/x]} {else-do Eelse[v/x]}}
 
 
 
@@ -183,7 +189,7 @@ Formal Substitution rules:
             [(Bigger l r) (Bigger (subst l from to) (subst r from to))]
             [(Smaller l r) (Smaller (subst l from to) (subst r from to))]
             [(Not b) (Not (subst b from to))]
-            [(If cond t-do e-do)(If (subst cond from to)(subst t-do from to)(subst e-do from to))]))
+            [(If Econd  Edo Eelse)(If (subst Econd  from to)(subst Edo from to)(subst Eelse from to))]))
           
 ;===== tests =====
 ;; haif of the tests are from to class
@@ -336,6 +342,8 @@ eval: Evaluation rules:
             [(If l m r) (let ([val (flang->bool l)]) (if val (eval m) (eval r)))]
             [(Not exp) (Bool (not (flang->bool (eval exp))))]))
 
+;===== Q5 =====
+; Extending the run procedure 
 
 (: run : String -> (U Number Boolean FLANG))
 (define (run str)
